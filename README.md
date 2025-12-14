@@ -14,12 +14,13 @@ This user script allows you to easily convert HTML content from web pages into c
 
 ## Installation
 
-The script is available on **[Greasy Fork](https://greasyfork.org/en/users/935206-shiquda)** for easy installation.
+Download the script from:
+`https://raw.githubusercontent.com/ExactDoug/copy-as-markdown-tamperscript/main/Copy-Selection-as-GFM-Markdown.user.j`
 
 ### How to Install
 
 1. Install a user script manager such as [Tampermonkey](https://www.tampermonkey.net/) or [Greasemonkey](https://www.greasespot.net/)
-2. Visit the script page on Greasy Fork
+2. Visit the above script URL in your web browser
 3. Click "Install this script"
 
 ## Script Capabilities
