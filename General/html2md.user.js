@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Easy Web Page to Markdown
 // @namespace    http://tampermonkey.net/
-// @version      0.3.14
+// @version      0.3.15
 // @description  Convert selected HTML to Markdown
 // @author       ExactDoug (forked from shiquda)
 // @match        *://*/*
@@ -183,7 +183,7 @@
                 if (!val) return;
                 const markdown = $modal.find('textarea').val();
                 GM_setClipboard(markdown);
-                const title = document.title.replaceAll(/[\\/:*?"<>|]/g, '_'); // File name cannot contain any of the following characters: * " \ / < > : | ?
+                const title = document.title.replaceAll(/[\\/:*?"<>|]/g, '_'); // File name cannot contain any of the following characters: * " \ / < > : | ?
                 const url = `${val}${title}.md&clipboard=true`;
                 window.open(url);
             });
@@ -271,6 +271,101 @@
 
     // Remove metadata/non-content elements that should not appear in markdown output
     turndownService.remove(['script', 'style', 'noscript']);
+
+    // ========================================================================
+    // FORM FIELD RULES - Capture input values, checkboxes, selects, textareas
+    // ========================================================================
+
+    // Helper: get field name/id for labeling
+    function getFieldKey(node) {
+        return node.getAttribute('name') || node.getAttribute('id') || '';
+    }
+
+    // Helper: get input value (property first for live DOM, then attribute)
+    function getFieldValue(node) {
+        const prop = typeof node.value === 'string' ? node.value : null;
+        const attr = node.getAttribute('value');
+        return (prop ?? attr ?? '').trim();
+    }
+
+    // Rule: Checkbox and radio inputs - show checked state
+    turndownService.addRule('formCheckboxRadio', {
+        filter: function (node) {
+            if (node.nodeName !== 'INPUT') return false;
+            const type = (node.getAttribute('type') || '').toLowerCase();
+            return type === 'checkbox' || type === 'radio';
+        },
+        replacement: function (content, node) {
+            const checked = node.checked || node.hasAttribute('checked');
+            const mark = checked ? 'x' : ' ';
+            return `[${mark}]`;
+        }
+    });
+
+    // Rule: Text-like inputs - output value inline
+    turndownService.addRule('formTextInputs', {
+        filter: function (node) {
+            if (node.nodeName !== 'INPUT') return false;
+            const type = (node.getAttribute('type') || 'text').toLowerCase();
+            const excludeTypes = ['checkbox', 'radio', 'button', 'submit', 'reset', 'hidden', 'image'];
+            return !excludeTypes.includes(type);
+        },
+        replacement: function (content, node) {
+            const val = getFieldValue(node);
+            // Return value or empty placeholder
+            return val ? val : '';
+        }
+    });
+
+    // Rule: Select elements - show selected option text
+    turndownService.addRule('formSelect', {
+        filter: 'select',
+        replacement: function (content, node) {
+            // Get selected option
+            const selectedIndex = node.selectedIndex;
+            if (selectedIndex >= 0 && node.options && node.options[selectedIndex]) {
+                const opt = node.options[selectedIndex];
+                return opt.text || opt.value || '';
+            }
+            // Fallback: try to find selected option from children
+            const selectedOpt = node.querySelector('option[selected]');
+            if (selectedOpt) {
+                return selectedOpt.textContent || selectedOpt.getAttribute('value') || '';
+            }
+            return '';
+        }
+    });
+
+    // Rule: Textarea - output content
+    turndownService.addRule('formTextarea', {
+        filter: 'textarea',
+        replacement: function (content, node) {
+            const val = (node.value ?? node.textContent ?? '').trim();
+            if (!val) return '';
+            // For multi-line content, wrap in code block
+            if (val.includes('\n')) {
+                return '\n```\n' + val + '\n```\n';
+            }
+            return val;
+        }
+    });
+
+    // Rule: Remove submit/reset/button inputs from output
+    turndownService.addRule('formButtonsRemove', {
+        filter: function (node) {
+            if (node.nodeName === 'BUTTON') return true;
+            if (node.nodeName !== 'INPUT') return false;
+            const type = (node.getAttribute('type') || '').toLowerCase();
+            return type === 'button' || type === 'submit' || type === 'reset' || type === 'image';
+        },
+        replacement: function () {
+            return '';
+        }
+    });
+
+    // ========================================================================
+    // END FORM FIELD RULES
+    // ========================================================================
 
     // Custom rule to normalize whitespace in link text
     // Turndown can produce links like "[\n\n  text  \n\n](url)" when <a> wraps block elements
@@ -517,7 +612,7 @@
                     }
                     break;
                 case 'ArrowDown':
-                    selectedElement = selectedElement.firstElementChild ? selectedElement.firstElementChild : selectedElement; // Shrink
+                    selectedElement = selectedElement.firstElementElement ? selectedElement.firstElementChild : selectedElement; // Shrink
                     break;
                 case 'ArrowLeft': // Find previous element, if it's the last child, select parent's next sibling until an element is found
                     var prev = selectedElement.previousElementSibling;
