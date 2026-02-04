@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Easy Web Page to Markdown
 // @namespace    http://tampermonkey.net/
-// @version      0.3.15
+// @version      0.3.16
 // @description  Convert selected HTML to Markdown
 // @author       ExactDoug (forked from shiquda)
 // @match        *://*/*
@@ -173,7 +173,7 @@
             var a = document.createElement('a');
             a.href = url;
             // Current page title + time
-            a.download = `${document.title}-${new Date().toISOString().replace(/:/g, '-')}.md`;
+            a.download = `${document.title.replace(/ /g, '_')}-${new Date().toISOString().replace(/:/g, '-')}.md`;
             a.click();
         });
 
