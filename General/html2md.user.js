@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Easy Web Page to Markdown
 // @namespace    http://tampermonkey.net/
-// @version      0.3.16
+// @version      0.3.17
 // @description  Convert selected HTML to Markdown
 // @author       ExactDoug (forked from shiquda)
 // @match        *://*/*
@@ -99,8 +99,55 @@
 
 
     // HTML2Markdown
+    // v0.3.17 FIX: Clone element and inject live form values into the clone
+    // before Turndown processes it. DOM .value properties don't appear in
+    // outerHTML, so without this Turndown sees empty form fields.
     function convertToMarkdown(element) {
-        var html = element.outerHTML;
+        var clone = element.cloneNode(true);
+
+        // Copy textarea values (.value doesn't appear between tags in outerHTML)
+        var origTextareas = element.querySelectorAll('textarea');
+        var cloneTextareas = clone.querySelectorAll('textarea');
+        for (var i = 0; i < origTextareas.length; i++) {
+            if (origTextareas[i].value) {
+                cloneTextareas[i].textContent = origTextareas[i].value;
+            }
+        }
+
+        // Copy input values into the value attribute so outerHTML includes them
+        var origInputs = element.querySelectorAll('input');
+        var cloneInputs = clone.querySelectorAll('input');
+        for (var i = 0; i < origInputs.length; i++) {
+            var inp = origInputs[i];
+            var type = (inp.getAttribute('type') || 'text').toLowerCase();
+            if (type === 'checkbox' || type === 'radio') {
+                // Sync checked state into the attribute
+                if (inp.checked) {
+                    cloneInputs[i].setAttribute('checked', 'checked');
+                } else {
+                    cloneInputs[i].removeAttribute('checked');
+                }
+            } else if (inp.value) {
+                cloneInputs[i].setAttribute('value', inp.value);
+            }
+        }
+
+        // Copy selected option from <select> elements
+        var origSelects = element.querySelectorAll('select');
+        var cloneSelects = clone.querySelectorAll('select');
+        for (var i = 0; i < origSelects.length; i++) {
+            if (origSelects[i].selectedIndex >= 0) {
+                var opts = cloneSelects[i].querySelectorAll('option');
+                for (var j = 0; j < opts.length; j++) {
+                    opts[j].removeAttribute('selected');
+                }
+                if (opts[origSelects[i].selectedIndex]) {
+                    opts[origSelects[i].selectedIndex].setAttribute('selected', 'selected');
+                }
+            }
+        }
+
+        var html = clone.outerHTML;
         return turndownService.turndown(html);
     }
 
@@ -133,7 +180,6 @@
             $modal.find('.h2m-obsidian-select').append($('<option>').val('').text('Send to Obsidian'));
             for (const vault in obsidianConfig) {
                 for (const path of obsidianConfig[vault]) {
-                    // Insert element
                     const $option = $('<option>')
                         .val(`obsidian://advanced-uri?vault=${vault}&filepath=${path}`)
                         .text(`${vault}: ${path}`);
@@ -143,11 +189,8 @@
         }
 
         $modal.find('textarea').on('input', function () {
-            // console.log("Input event triggered");
             var markdown = $(this).val();
             var html = marked.parse(markdown);
-            // console.log("Markdown:", markdown);
-            // console.log("HTML:", html);
             $modal.find('.h2m-preview').html(html);
         });
 
@@ -172,7 +215,6 @@
             var url = URL.createObjectURL(blob);
             var a = document.createElement('a');
             a.href = url;
-            // Current page title + time
             a.download = `${document.title.replace(/ /g, '_')}-${new Date().toISOString().replace(/:/g, '-')}.md`;
             a.click();
         });
@@ -183,7 +225,7 @@
                 if (!val) return;
                 const markdown = $modal.find('textarea').val();
                 GM_setClipboard(markdown);
-                const title = document.title.replaceAll(/[\\/:*?"<>|]/g, '_'); // File name cannot contain any of the following characters: * " \ / < > : | ?
+                const title = document.title.replaceAll(/[\\/:*?"<>|]/g, '_');
                 const url = `${val}${title}.md&clipboard=true`;
                 window.open(url);
             });
@@ -194,28 +236,19 @@
         });
 
         // Sync scrolling
-        // Get two elements
         var $textarea = $modal.find('textarea');
         var $preview = $modal.find('.h2m-preview');
         var isScrolling = false;
 
-        // When textarea scrolls, set preview scroll position
         $textarea.on('scroll', function () {
-            if (isScrolling) {
-                isScrolling = false;
-                return;
-            }
+            if (isScrolling) { isScrolling = false; return; }
             var scrollPercentage = this.scrollTop / (this.scrollHeight - this.offsetHeight);
             $preview[0].scrollTop = scrollPercentage * ($preview[0].scrollHeight - $preview[0].offsetHeight);
             isScrolling = true;
         });
 
-        // When preview scrolls, set textarea scroll position
         $preview.on('scroll', function () {
-            if (isScrolling) {
-                isScrolling = false;
-                return;
-            }
+            if (isScrolling) { isScrolling = false; return; }
             var scrollPercentage = this.scrollTop / (this.scrollHeight - this.offsetHeight);
             $textarea[0].scrollTop = scrollPercentage * ($textarea[0].scrollHeight - $textarea[0].offsetHeight);
             isScrolling = true;
@@ -232,9 +265,8 @@
 
     // Start selecting
     function startSelecting() {
-        $('body').addClass('h2m-no-scroll'); // Prevent page scrolling
+        $('body').addClass('h2m-no-scroll');
         isSelecting = true;
-        // Operation guide
         tip(marked.parse(guide));
     }
 
@@ -253,13 +285,9 @@
             .appendTo('body')
             .hide()
             .fadeIn(200);
-        if (timeout === null) {
-            return;
-        }
+        if (timeout === null) { return; }
         setTimeout(function () {
-            $tipElement.fadeOut(200, function () {
-                $tipElement.remove();
-            });
+            $tipElement.fadeOut(200, function () { $tipElement.remove(); });
         }, timeout);
     }
 
@@ -312,7 +340,6 @@
         },
         replacement: function (content, node) {
             const val = getFieldValue(node);
-            // Return value or empty placeholder
             return val ? val : '';
         }
     });
@@ -321,13 +348,11 @@
     turndownService.addRule('formSelect', {
         filter: 'select',
         replacement: function (content, node) {
-            // Get selected option
             const selectedIndex = node.selectedIndex;
             if (selectedIndex >= 0 && node.options && node.options[selectedIndex]) {
                 const opt = node.options[selectedIndex];
                 return opt.text || opt.value || '';
             }
-            // Fallback: try to find selected option from children
             const selectedOpt = node.querySelector('option[selected]');
             if (selectedOpt) {
                 return selectedOpt.textContent || selectedOpt.getAttribute('value') || '';
@@ -342,7 +367,6 @@
         replacement: function (content, node) {
             const val = (node.value ?? node.textContent ?? '').trim();
             if (!val) return '';
-            // For multi-line content, wrap in code block
             if (val.includes('\n')) {
                 return '\n```\n' + val + '\n```\n';
             }
@@ -358,9 +382,7 @@
             const type = (node.getAttribute('type') || '').toLowerCase();
             return type === 'button' || type === 'submit' || type === 'reset' || type === 'image';
         },
-        replacement: function () {
-            return '';
-        }
+        replacement: function () { return ''; }
     });
 
     // ========================================================================
@@ -368,19 +390,13 @@
     // ========================================================================
 
     // Custom rule to normalize whitespace in link text
-    // Turndown can produce links like "[\n\n  text  \n\n](url)" when <a> wraps block elements
-    // This collapses whitespace to produce clean "[text](url)" format
     turndownService.addRule('normalizeLinkText', {
         filter: 'a',
         replacement: function (content, node) {
-            // Collapse whitespace inside link text
             const text = content.replace(/\s+/g, ' ').trim();
-
             const href = node.getAttribute('href') || '';
             const title = node.getAttribute('title');
-
-            if (!href) return text; // no href? just return plain text
-
+            if (!href) return text;
             const titlePart = title ? ' "' + title.replace(/"/g, '\\"') + '"' : '';
             return '[' + text + '](' + href + titlePart + ')';
         }
@@ -499,7 +515,7 @@
         .h2m-modal .h2m-buttons button,
         .h2m-modal .h2m-obsidian-select {
             margin-left: 10px;
-            background-color: #4CAF50; /* Green */
+            background-color: #4CAF50;
             border: none;
             color: white;
             padding: 13px 16px;
@@ -560,16 +576,7 @@
             e.preventDefault();
             startSelecting();
         }
-        // else {
-        //     console.log(e.ctrlKey, e.altKey, e.shiftKey, e.key.toUpperCase());
-        // }
     });
-    // $(document).on('keydown', function (e) {
-    //     if (e.ctrlKey && e.key === 'm') {
-    //         e.preventDefault();
-    //         startSelecting()
-    //     }
-    // });
 
     GM_registerMenuCommand('Convert to Markdown', function () {
         startSelecting()
@@ -577,44 +584,41 @@
 
 
 
-    $(document).on('mouseover', function (e) { // Start selecting
+    $(document).on('mouseover', function (e) {
         if (isSelecting) {
             $(selectedElement).removeClass('h2m-selection-box');
             selectedElement = e.target;
             $(selectedElement).addClass('h2m-selection-box');
         }
-    }).on('wheel', function (e) { // Mouse wheel event
+    }).on('wheel', function (e) {
         if (isSelecting) {
             e.preventDefault();
             if (e.originalEvent.deltaY < 0) {
-                selectedElement = selectedElement.parentElement ? selectedElement.parentElement : selectedElement; // Expand
+                selectedElement = selectedElement.parentElement ? selectedElement.parentElement : selectedElement;
                 if (selectedElement.tagName === 'HTML' || selectedElement.tagName === 'BODY') {
                     selectedElement = selectedElement.firstElementChild;
                 }
             } else {
-                selectedElement = selectedElement.firstElementChild ? selectedElement.firstElementChild : selectedElement; // Shrink
+                selectedElement = selectedElement.firstElementChild ? selectedElement.firstElementChild : selectedElement;
             }
             $('.h2m-selection-box').removeClass('h2m-selection-box');
             $(selectedElement).addClass('h2m-selection-box');
         }
-    }).on('keydown', function (e) { // Keyboard event
+    }).on('keydown', function (e) {
         if (isSelecting) {
             e.preventDefault();
-            if (e.key === 'Escape') {
-                endSelecting();
-                return;
-            }
-            switch (e.key) { // Arrow keys: up down left right
+            if (e.key === 'Escape') { endSelecting(); return; }
+            switch (e.key) {
                 case 'ArrowUp':
-                    selectedElement = selectedElement.parentElement ? selectedElement.parentElement : selectedElement; // Expand
-                    if (selectedElement.tagName === 'HTML' || selectedElement.tagName === 'BODY') { // Exclude HTML and BODY
+                    selectedElement = selectedElement.parentElement ? selectedElement.parentElement : selectedElement;
+                    if (selectedElement.tagName === 'HTML' || selectedElement.tagName === 'BODY') {
                         selectedElement = selectedElement.firstElementChild;
                     }
                     break;
                 case 'ArrowDown':
-                    selectedElement = selectedElement.firstElementElement ? selectedElement.firstElementChild : selectedElement; // Shrink
+                    selectedElement = selectedElement.firstElementChild ? selectedElement.firstElementChild : selectedElement;
                     break;
-                case 'ArrowLeft': // Find previous element, if it's the last child, select parent's next sibling until an element is found
+                case 'ArrowLeft':
                     var prev = selectedElement.previousElementSibling;
                     while (prev === null && selectedElement.parentElement !== null) {
                         selectedElement = selectedElement.parentElement;
@@ -641,12 +645,10 @@
                     }
                     break;
             }
-
             $('.h2m-selection-box').removeClass('h2m-selection-box');
-            $(selectedElement).addClass('h2m-selection-box'); // Update selected element style
+            $(selectedElement).addClass('h2m-selection-box');
         }
-    }
-    ).on('mousedown', function (e) { // Mouse event, using mousedown to prevent triggering other events after clicking element
+    }).on('mousedown', function (e) {
         if (isSelecting) {
             e.preventDefault();
             var markdown = convertToMarkdown(selectedElement);
