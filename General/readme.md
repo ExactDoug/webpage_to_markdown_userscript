@@ -24,5 +24,6 @@
 
 ## Notes
 
-- The conversion libraries (Turndown, turndown-plugin-gfm, marked) are not loaded until you actually invoke the tool, so the script adds nothing to normal page loads. jQuery is not used at all.
+- The conversion libraries (Turndown 7.2.4, turndown-plugin-gfm 1.0.7, marked 12.0.0) are vendored into the script itself. There is no `@require` and no `@resource`, so nothing is fetched at install time or at run time and no upstream change can alter what the script does after you have reviewed it. Each vendored block records its version, source URL and SHA-256 so it can be checked against upstream. jQuery is not used at all.
+- The libraries are still initialized lazily, on first use, so a page you never convert executes none of their code.
 - Captcha frames (Cloudflare Turnstile, hCaptcha, reCAPTCHA) are excluded. Running a userscript inside a challenge frame can make the challenge fail.
