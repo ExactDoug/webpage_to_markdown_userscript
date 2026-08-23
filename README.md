@@ -15,7 +15,7 @@ This user script allows you to easily convert HTML content from web pages into c
 ## Installation
 
 Download the script from:
-`https://raw.githubusercontent.com/ExactDoug/copy-as-markdown-tamperscript/main/Copy-Selection-as-GFM-Markdown.user.js`
+`https://raw.githubusercontent.com/ExactDoug/webpage_to_markdown_userscript/main/General/html2md.user.js`
 
 ### How to Install
 
