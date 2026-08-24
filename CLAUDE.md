@@ -6,7 +6,7 @@ Fork of shiquda's original. Single deliverable: `General/html2md.user.js`.
 ## Current state (2026-08-21)
 
 - **Released on `main`:** v0.3.17
-- **In review:** v0.4.0 on branch `fix/captcha-crash-and-element-selection`, PR
+- **In review:** v0.4.1 on branch `fix/captcha-crash-and-element-selection`, PR
   [#5](https://github.com/ExactDoug/webpage_to_markdown_userscript/pull/5) — OPEN, mergeable,
   awaiting manual testing by Doug.
 - **Next step:** Doug tests from the branch raw URL, then merges. No further code planned.
@@ -80,6 +80,21 @@ converts posts `result` to the top frame, which owns the modal (a modal inside a
 would be unusable). Messages are tagged `__h2m: 'h2m:v1'`. The menu command registers only in
 the top frame to avoid one duplicate entry per iframe.
 
+### The download anchor must stay detached
+
+`showMarkdownModal()`'s download handler creates an `<a download>` and clicks it **without
+attaching it to the document**. This is not an oversight. v0.4.0 appended it to `document.body`
+and that broke downloading in two ways:
+
+- Pages with a document-level anchor-click handler (SPA routers, analytics wrappers) call
+  `preventDefault()` and reopen the href themselves, so the file appeared as a `blob:` tab
+  instead of downloading.
+- Downloading within 700ms of converting hit our own capture-phase click suppression, which
+  swallowed the anchor click entirely.
+
+A detached anchor has no propagation path, so neither the page nor our own listeners can see it.
+Fixed in v0.4.1 and covered by a regression test.
+
 ### Why the hit testing looks the way it does
 
 Each piece exists because of a specific way selection failed:
@@ -130,7 +145,7 @@ against headless Chromium (Playwright's build at
 `Page.addScriptToEvaluateOnNewDocument` and `GM_*` stubbed. **The harness is deliberately not in
 this repo** — rebuild it or ask for the copy from the session that wrote it.
 
-The 14 checks it makes:
+The 15 checks it makes:
 
 1. Loads with zero libraries initialized, zero globals leaked, zero errors
 2. `Ctrl+M` enters selection mode without fetching anything (`@resource` reads must be 0)
@@ -146,6 +161,9 @@ The 14 checks it makes:
 12. Escape leaves no highlight and no guide behind
 13. No uncaught errors in either document across the whole run
 14. No off-origin request from any document at any point (`performance.getEntriesByType`)
+15. Download writes a real file rather than opening a `blob:` tab, on a fixture whose page
+    intercepts anchor clicks, clicked immediately after converting (covers both v0.4.0
+    download regressions). Uses `Browser.setDownloadBehavior` + `Browser.downloadWillBegin`.
 
 Gotchas if you rebuild it: CDP page-session input is **not** routed into an out-of-process
 iframe — dispatch to the frame's own session in frame-local coordinates. CDP also propagates the
