@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Easy Web Page to Markdown
 // @namespace    http://tampermonkey.net/
-// @version      0.4.0
+// @version      0.4.1
 // @description  Convert selected HTML to Markdown
 // @author       ExactDoug (forked from shiquda)
 // @match        *://*/*
@@ -333,13 +333,19 @@
         downloadBtn.addEventListener('click', function () {
             const blob = new Blob([textarea.value], { type: 'text/markdown' });
             const url = URL.createObjectURL(blob);
-            const a = h('a', {
-                href: url,
-                download: `${document.title.replace(/ /g, '_')}-${new Date().toISOString().replace(/:/g, '-')}.md`
-            });
-            document.body.appendChild(a);
+            // The anchor is deliberately NOT attached to the document, and this
+            // is load-bearing. An anchor inside the page's DOM sends its click
+            // through the page's own handlers: SPA routers and analytics
+            // wrappers routinely preventDefault() anchor clicks and reopen the
+            // href themselves, which turns the download into a blob: tab. It
+            // would also pass through our own capture-phase click suppression,
+            // which swallows it entirely if you download within 700ms of
+            // converting. A detached anchor has no propagation path, so neither
+            // can interfere. (Both were v0.4.0 regressions; v0.3.x did this.)
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${document.title.replace(/ /g, '_')}-${new Date().toISOString().replace(/:/g, '-')}.md`;
             a.click();
-            document.body.removeChild(a);
             setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
         });
 
