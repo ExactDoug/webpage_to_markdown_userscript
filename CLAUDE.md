@@ -3,19 +3,20 @@
 A Tampermonkey/Violentmonkey userscript that converts a hovered page element to Markdown.
 Fork of shiquda's original. Single deliverable: `General/html2md.user.js`.
 
-## Current state (2026-08-21)
+## Current state (2026-08-24)
 
-- **Released on `main`:** v0.3.17
-- **In review:** v0.4.1 on branch `fix/captcha-crash-and-element-selection`, PR
-  [#5](https://github.com/ExactDoug/webpage_to_markdown_userscript/pull/5) — OPEN, mergeable,
-  awaiting manual testing by Doug.
-- **Next step:** Doug tests from the branch raw URL, then merges. No further code planned.
+- **Released on `main`:** v0.4.0 — PR
+  [#5](https://github.com/ExactDoug/webpage_to_markdown_userscript/pull/5) merged 2026-08-24
+  (Turnstile crash, vendored libraries, selection rewrite).
+- **In review:** v0.4.1 on branch `fix/download-blob-tab` — one commit fixing a v0.4.0
+  regression where Download opened a `blob:` tab instead of saving a file.
+- **Next step:** Doug tests the download fix, then merges.
 
-Install for testing (branch build — `@updateURL`/`@downloadURL` in the header still point at
-`main`, so a manager's update check will not see this version):
+Install for testing (branch build — `@updateURL`/`@downloadURL` in the header point at `main`,
+so a manager's update check will not see a branch version):
 
 ```
-https://raw.githubusercontent.com/ExactDoug/webpage_to_markdown_userscript/fix/captcha-crash-and-element-selection/General/html2md.user.js
+https://raw.githubusercontent.com/ExactDoug/webpage_to_markdown_userscript/fix/download-blob-tab/General/html2md.user.js
 ```
 
 ## Hard constraints
